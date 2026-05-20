@@ -9,7 +9,10 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const API_URL = '/api';
+  // Use environment variable for backend URL
+  // In development: http://localhost:3000
+  // In production (Vercel): https://your-backend-url.com (from env var)
+  const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
   useEffect(() => {
     const fetchUser = async () => {

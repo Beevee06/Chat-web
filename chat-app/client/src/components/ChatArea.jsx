@@ -1,12 +1,35 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Smile, Camera, X } from 'lucide-react';
+import { Send, Image as ImageIcon, Smile, Camera, X, Phone, Video, PhoneOff } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import moment from 'moment';
 import axios from 'axios';
 import CameraModal from './CameraModal';
 
-const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTyping, isTyping, typingUser, API_URL }) => {
+const ChatArea = ({
+  user,
+  activeChat,
+  messages,
+  onlineUsers,
+  onSendMessage,
+  onTyping,
+  isTyping,
+  typingUser,
+  API_URL,
+  onStartCall,
+  onAcceptCall,
+  onRejectCall,
+  onEndCall,
+  incomingCall,
+  incomingCallUser,
+  currentCall,
+  activeCallUser,
+  callStatus,
+  callError,
+  onDismissCallError,
+  localStream,
+  remoteStream
+}) => {
   const [text, setText] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -16,12 +39,49 @@ const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTy
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
 
   const isOnline = activeChat ? onlineUsers.includes(activeChat.id) : false;
+  const isCurrentChatOnCall = activeChat && currentCall && currentCall.userId === activeChat.id;
+  const canStartCall = activeChat && isOnline && !currentCall && callStatus === 'idle';
+  const callStatusText = callStatus === 'outgoing'
+    ? 'Dang goi...'
+    : callStatus === 'incoming'
+      ? 'Cuoc goi den...'
+      : callStatus === 'connecting'
+        ? 'Dang ket noi...'
+        : callStatus === 'connected'
+          ? 'Dang trong cuoc goi'
+          : '';
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream || null;
+    }
+  }, [localStream]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream || null;
+    }
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = remoteStream || null;
+    }
+  }, [remoteStream]);
 
   const handleTextChange = (e) => {
     setText(e.target.value);
@@ -96,6 +156,40 @@ const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTy
           <h2 className="text-2xl font-bold text-white neon-text mb-2">Welcome to Nexus</h2>
           <p className="text-cyber-muted max-w-sm">Select a contact from the sidebar to establish a secure connection and start communicating.</p>
         </motion.div>
+
+        {incomingCall && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-40 p-4">
+            <div className="w-full max-w-sm bg-cyber-card border border-cyber-accent/30 rounded-2xl p-6 text-center">
+              <p className="text-cyber-muted text-sm mb-2">Incoming {incomingCall.callType} call</p>
+              <h3 className="text-xl font-bold text-white mb-6">{incomingCallUser?.username || 'Unknown user'}</h3>
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={onRejectCall}
+                  className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 flex items-center justify-center"
+                >
+                  <PhoneOff size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onAcceptCall}
+                  className="w-12 h-12 rounded-full bg-green-500/20 text-green-400 hover:bg-green-500/40 flex items-center justify-center"
+                >
+                  <Phone size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {callError && (
+          <div className="absolute top-4 right-4 left-4 mx-auto max-w-md bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded-xl backdrop-blur-sm z-30 flex items-center justify-between gap-3">
+            <span className="text-sm">{callError}</span>
+            <button type="button" onClick={onDismissCallError} className="text-red-200 hover:text-white">
+              <X size={16} />
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -117,6 +211,44 @@ const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTy
           <p className={`text-xs ${isOnline ? 'text-green-400' : 'text-cyber-muted'}`}>
             {isOnline ? 'Online' : 'Offline'}
           </p>
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          {isCurrentChatOnCall ? (
+            <button
+              type="button"
+              onClick={onEndCall}
+              className="w-10 h-10 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 flex items-center justify-center"
+              title="End call"
+            >
+              <PhoneOff size={18} />
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => onStartCall('audio')}
+                disabled={!canStartCall}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                  canStartCall ? 'bg-cyber-accent/20 text-cyber-accent hover:bg-cyber-accent/30' : 'bg-white/5 text-cyber-muted cursor-not-allowed'
+                }`}
+                title="Audio call"
+              >
+                <Phone size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onStartCall('video')}
+                disabled={!canStartCall}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                  canStartCall ? 'bg-cyber-accent/20 text-cyber-accent hover:bg-cyber-accent/30' : 'bg-white/5 text-cyber-muted cursor-not-allowed'
+                }`}
+                title="Video call"
+              >
+                <Video size={18} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -286,6 +418,91 @@ const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTy
           </button>
         </form>
       </div>
+
+      {currentCall && (
+        <div className="absolute top-20 right-6 w-80 bg-black/80 border border-cyber-accent/40 rounded-2xl overflow-hidden z-20 backdrop-blur-md shadow-[0_0_30px_rgba(0,240,255,0.15)]">
+          <div className="px-4 py-3 border-b border-cyber-accent/20">
+            <p className="text-sm font-semibold text-white">{activeCallUser?.username || activeChat?.username || 'In call'}</p>
+            <p className="text-xs text-cyber-muted">{callStatusText || 'Connecting call...'}</p>
+          </div>
+
+          <div className="relative bg-black aspect-video flex items-center justify-center">
+            {currentCall.callType === 'video' ? (
+              <>
+                {remoteStream ? (
+                  <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-cyber-muted text-sm">Waiting for remote video...</div>
+                )}
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="absolute bottom-3 right-3 w-28 h-20 bg-black/80 rounded-lg object-cover border border-cyber-accent/30"
+                />
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-3">
+                <audio ref={remoteAudioRef} autoPlay />
+                <div className="w-14 h-14 rounded-full overflow-hidden border border-cyber-accent/40">
+                  <img
+                    src={activeCallUser?.avatar ? activeCallUser.avatar : `https://api.dicebear.com/7.x/bottts/svg?seed=${activeCallUser?.username || 'caller'}`}
+                    alt="Call user"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <p className="text-sm text-cyber-muted">Audio call in progress</p>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 flex justify-center">
+            <button
+              type="button"
+              onClick={onEndCall}
+              className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 flex items-center justify-center"
+              title="End call"
+            >
+              <PhoneOff size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {incomingCall && (
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-40 p-4">
+          <div className="w-full max-w-sm bg-cyber-card border border-cyber-accent/30 rounded-2xl p-6 text-center">
+            <p className="text-cyber-muted text-sm mb-2">Incoming {incomingCall.callType} call</p>
+            <h3 className="text-xl font-bold text-white mb-6">{incomingCallUser?.username || 'Unknown user'}</h3>
+            <div className="flex items-center justify-center gap-4">
+              <button
+                type="button"
+                onClick={onRejectCall}
+                className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 flex items-center justify-center"
+              >
+                <PhoneOff size={20} />
+              </button>
+              <button
+                type="button"
+                onClick={onAcceptCall}
+                className="w-12 h-12 rounded-full bg-green-500/20 text-green-400 hover:bg-green-500/40 flex items-center justify-center"
+              >
+                <Phone size={20} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {callError && (
+        <div className="absolute top-4 right-4 left-4 mx-auto max-w-md bg-red-500/10 border border-red-500/40 text-red-300 px-4 py-3 rounded-xl backdrop-blur-sm z-30 flex items-center justify-between gap-3">
+          <span className="text-sm">{callError}</span>
+          <button type="button" onClick={onDismissCallError} className="text-red-200 hover:text-white">
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Fullscreen Image Modal */}
       <AnimatePresence>
