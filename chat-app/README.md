@@ -10,6 +10,7 @@ Một hệ thống web chat realtime hiện đại với phong cách Cyberpunk, 
 - 💬 Chat Realtime (Socket.IO)
 - 😀 Emoji & Gửi Ảnh đính kèm
 - 📷 Chụp ảnh trực tiếp từ Webcam với giao diện Camera ngắm Cyberpunk
+- 📞 Gọi thoại/video 1-1 realtime (WebRTC, kiểu Messenger)
 - 🟢 Trạng thái Online/Offline, Đang gõ phím (Typing)
 - 👀 Trạng thái đã xem (Seen)
 - 🌃 Giao diện Dark Mode, Neon Glassmorphism
@@ -44,16 +45,80 @@ Bạn chỉ cần lấy điện thoại hoặc máy tính khác (chung mạng Wi
 
 _Lưu ý: API và WebSocket đang được trỏ vào `http://localhost:3000` theo cấu hình mặc định. Nếu bạn muốn truy cập từ thiết bị khác, vui lòng thay `localhost` thành IP máy tính của bạn trong thư mục `client/src/context/AuthContext.jsx` và `client/src/pages/Chat.jsx`, hoặc cấu hình Proxy._
 
-## Mở rộng qua Internet (Tùy chọn)
+## Deploy web qua Cloudflare Tunnel
 
-Để truy cập từ bất cứ đâu trên thế giới, bạn có thể dùng Cloudflare Tunnel:
+Project đã có sẵn script mở tunnel. Chạy frontend + backend trước, sau đó mở tunnel:
 ```bash
-cloudflared tunnel --url http://localhost:5173
+npm run start-tunnel
 ```
-Và chuyển API_URL ở Frontend để trỏ vào backend đã được public, hoặc host Backend và Frontend trên các dịch vụ đám mây.
+Mặc định tunnel public frontend ở `http://localhost:5173` (kèm proxy API/WebSocket sang backend `3000`), nên bạn không cần sửa `API_URL` thủ công.
+
+Bạn cũng có thể đổi target bằng biến môi trường:
+```bash
+TUNNEL_TARGET_URL=http://localhost:5173 npm run start-tunnel
+```
+PowerShell (Windows):
+```powershell
+$env:TUNNEL_TARGET_URL="http://localhost:5173"; npm run start-tunnel
+```
+
+## Running Backend on Your Laptop as a Server
+
+### Quick Start (Recommended - Backend + Tunnel)
+
+```bash
+cd chat-app
+laptop-server.bat
+```
+Then choose option **2** to run Backend + Tunnel.
+
+### Backend Only (Local Development)
+
+```bash
+cd chat-app
+npm run start-server
+```
+Backend runs on `http://localhost:3000`
+
+### Backend + Cloudflare Tunnel (Expose to Internet)
+
+**Terminal 1 - Backend:**
+```bash
+cd chat-app
+npm run start-server
+```
+
+**Terminal 2 - Tunnel:**
+```bash
+cd chat-app
+npm run start-tunnel
+```
+
+You'll get a public URL like: `https://abc123.trycloudflare.com`
+
+### Setting Production URL on Vercel
+
+1. Go to Vercel Dashboard → Your Project → **Settings** → **Environment Variables**
+2. Add new variable:
+   ```
+   VITE_BACKEND_URL=https://your-cloudflare-url.com
+   ```
+3. **Redeploy** frontend
+
+### Auto-Start Backend on Laptop Restart (Windows)
+
+Create a scheduled task:
+1. Open **Task Scheduler**
+2. Create Basic Task → Name: "Nexus Chat Backend"
+3. Trigger: "At startup"
+4. Action: Start program `laptop-server.bat`
+5. Set to run with highest privileges
 
 ## Cấu trúc thư mục
-- `/client`: Frontend (React)
-- `/server`: Backend (Express, SQLite, Socket.io)
+- `/client`: Frontend (React) - Deploy to Vercel
+- `/server`: Backend (Express, SQLite, Socket.io) - Run on your laptop
 - `/server/database.sqlite`: Nơi lưu trữ toàn bộ dữ liệu tự động sinh.
 - `/server/uploads`: Nơi lưu trữ hình ảnh.
+- `laptop-server.bat`: Quick launcher for backend + tunnel
+- `run-backend.bat`: Run backend only
+- `run-tunnel.bat`: Run Cloudflare Tunnel only
