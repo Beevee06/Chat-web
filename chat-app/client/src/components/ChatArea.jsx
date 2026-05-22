@@ -1,29 +1,49 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Smile, Camera, X } from 'lucide-react';
+import { Send, Image as ImageIcon, Smile, Camera, X, Phone, Video } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import moment from 'moment';
 import axios from 'axios';
 import CameraModal from './CameraModal';
 
-const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTyping, isTyping, typingUser, API_URL }) => {
+const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTyping, isTyping, typingUser, API_URL, onStartCall }) => {
   const [text, setText] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [fullscreenImage, setFullscreenImage] = useState(null);
+  const [isHighlight, setIsHighlight] = useState(false);
   const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
   const isOnline = activeChat ? onlineUsers.includes(activeChat.id) : false;
+  const isPending = activeChat?.status === 'pending';
+  const isRequester = activeChat && activeChat.requester_id === user.id;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    if (!activeChat) return;
+    setIsHighlight(true);
+    const timer = setTimeout(() => setIsHighlight(false), 700);
+    const focusTimer = setTimeout(() => {
+      if (!isPending) {
+        inputRef.current?.focus();
+      }
+    }, 120);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(focusTimer);
+    };
+  }, [activeChat?.id, isPending]);
+
   const handleTextChange = (e) => {
+    if (isPending) return;
     setText(e.target.value);
     
     // Typing indicator logic
@@ -49,6 +69,7 @@ const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTy
 
   const handleSend = async (e) => {
     if (e) e.preventDefault();
+    if (isPending) return;
     if (!text.trim() && !selectedImage) return;
 
     let imageUrl = null;
@@ -101,7 +122,7 @@ const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTy
   }
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-black/60 relative">
+    <div className={`flex-1 h-full flex flex-col bg-black/60 relative transition-shadow ${isHighlight ? 'ring-2 ring-cyber-accent/40 shadow-[0_0_35px_rgba(0,240,255,0.25)]' : ''}`}>
       {/* Header */}
       <div className="h-16 px-6 border-b border-cyber-accent/20 bg-cyber-bg/80 backdrop-blur-md flex items-center gap-4 shrink-0 z-10">
         <div className="relative w-10 h-10 rounded-full">
@@ -115,13 +136,40 @@ const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTy
         <div>
           <h2 className="font-bold text-white leading-tight">{activeChat.username}</h2>
           <p className={`text-xs ${isOnline ? 'text-green-400' : 'text-cyber-muted'}`}>
-            {isOnline ? 'Online' : 'Offline'}
+            {isPending ? (isRequester ? 'Request Sent' : 'Pending Request') : (isOnline ? 'Online' : 'Offline')}
           </p>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => !isPending && onStartCall?.('voice')}
+            className={`p-2.5 rounded-full border border-cyber-accent/30 bg-black/40 text-cyber-accent transition-colors inline-flex items-center justify-center ${isPending ? 'opacity-40 cursor-not-allowed' : 'hover:bg-cyber-accent/20'}`}
+            title="Voice call"
+            disabled={isPending}
+          >
+            <Phone size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={() => !isPending && onStartCall?.('video')}
+            className={`p-2.5 rounded-full border border-cyber-accent/30 bg-black/40 text-cyber-accent transition-colors inline-flex items-center justify-center ${isPending ? 'opacity-40 cursor-not-allowed' : 'hover:bg-cyber-accent/20'}`}
+            title="Video call"
+            disabled={isPending}
+          >
+            <Video size={18} />
+          </button>
         </div>
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative z-0">
+        {isPending && (
+          <div className="mb-4 rounded-xl border border-cyber-accent/30 bg-cyber-accent/10 px-4 py-3 text-sm text-cyber-text">
+            {isRequester
+              ? 'Request sent. You can chat once the user accepts.'
+              : 'This request is pending. Accept it to start chatting.'}
+          </div>
+        )}
         <AnimatePresence>
           {messages.map((msg, idx) => {
             const isMe = msg.sender_id === user.id;
@@ -266,18 +314,20 @@ const ChatArea = ({ user, activeChat, messages, onlineUsers, onSendMessage, onTy
           <div className="flex-1 bg-black/40 border border-cyber-accent/20 rounded-2xl min-h-[48px] max-h-32 flex items-center px-4 relative overflow-hidden focus-within:border-cyber-accent/60 transition-colors">
             <input
               type="text"
+              ref={inputRef}
               value={text}
               onChange={handleTextChange}
-              placeholder="Type a message..."
+              placeholder={isPending ? 'Chat locked until accepted...' : 'Type a message...'}
               className="w-full bg-transparent border-none focus:outline-none text-white py-3"
+              disabled={isPending}
             />
           </div>
 
           <button 
             type="submit" 
-            disabled={!text.trim() && !selectedImage}
+            disabled={isPending || (!text.trim() && !selectedImage)}
             className={`p-3 rounded-xl shrink-0 transition-all ${
-              text.trim() || selectedImage 
+              !isPending && (text.trim() || selectedImage) 
                 ? 'bg-cyber-accent text-black shadow-[0_0_15px_rgba(0,240,255,0.4)] hover:shadow-[0_0_20px_rgba(0,240,255,0.6)] scale-100' 
                 : 'bg-white/5 text-cyber-muted scale-95 cursor-not-allowed'
             }`}

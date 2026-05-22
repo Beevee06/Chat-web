@@ -8,16 +8,17 @@ export default {
     extend: {
       colors: {
         cyber: {
-          bg: '#0a0a12',
-          card: '#161623',
-          accent: '#00f0ff',
-          secondary: '#ff003c',
-          text: '#e0e0ff',
-          muted: '#6a6a8c'
+          bg: '#0f131e',
+          card: '#1b1f2b',
+          accent: '#00f5ff',
+          secondary: '#ff24e4',
+          text: '#dfe2f2',
+          muted: '#b9caca'
         }
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
+        display: ['Sora', 'sans-serif']
       }
     },
   },

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Chat from './pages/Chat';
+import Admin from './pages/Admin';
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
@@ -20,6 +21,7 @@ function App() {
       <div className="w-full h-screen bg-cyber-bg text-cyber-text overflow-hidden flex">
         <Routes>
           <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/" element={
             <ProtectedRoute>
               <Chat />

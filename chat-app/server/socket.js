@@ -3,6 +3,10 @@ const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('./middlewares/auth');
 const db = require('./database');
 
+const onlineUsers = new Map(); // Map user_id to socket_id
+
+const getOnlineUsersCount = () => onlineUsers.size;
+
 const setupSocket = (server) => {
   const io = socketIo(server, {
     cors: {
@@ -10,8 +14,6 @@ const setupSocket = (server) => {
       methods: ['GET', 'POST']
     }
   });
-
-  const onlineUsers = new Map(); // Map user_id to socket_id
 
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
@@ -89,4 +91,4 @@ const setupSocket = (server) => {
   });
 };
 
-module.exports = setupSocket;
+module.exports = { setupSocket, getOnlineUsersCount };

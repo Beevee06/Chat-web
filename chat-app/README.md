@@ -15,12 +15,13 @@ Một hệ thống web chat realtime hiện đại với phong cách Cyberpunk, 
 - 🌃 Giao diện Dark Mode, Neon Glassmorphism
 - 📱 Responsive Design
 
-## Công nghệ sử dụng
+
 
 - **Frontend**: ReactJS, Vite, TailwindCSS, Framer Motion, Socket.IO Client, Emoji-picker-react.
 - **Backend**: Node.js, Express, Socket.IO, SQLite (Database nhẹ, không cần cài đặt db server), Multer (upload), JWT, Bcrypt.
 
-## Cài Đặt và Chạy Server (Trên Máy Của Bạn)
+
+
 
 1. Mở Terminal tại thư mục `chat-app`
 2. Chạy lệnh để cài đặt toàn bộ thư viện:

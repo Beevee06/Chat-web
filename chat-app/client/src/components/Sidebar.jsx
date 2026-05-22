@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { UserPlus, Search, LogOut, Check, X, Copy } from 'lucide-react';
+import { UserPlus, Search, LogOut, Check, Copy, Phone, Video } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
-const Sidebar = ({ user, friends, onlineUsers, activeChat, setActiveChat, fetchFriends, API_URL }) => {
+const Sidebar = ({ user, friends, onlineUsers, activeChat, setActiveChat, fetchFriends, API_URL, onStartCall }) => {
   const [friendCode, setFriendCode] = useState('');
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
@@ -116,14 +116,24 @@ const Sidebar = ({ user, friends, onlineUsers, activeChat, setActiveChat, fetchF
             const isOnline = onlineUsers.includes(friend.id);
             const isPending = friend.status === 'pending';
             const isRequester = friend.requester_id === user.id;
+            const isActive = activeChat?.id === friend.id;
+
+            const handleSelectChat = () => {
+              setActiveChat(friend);
+            };
 
             return (
               <div 
                 key={friend.friendship_id}
-                onClick={() => !isPending && setActiveChat(friend)}
-                className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${activeChat?.id === friend.id ? 'bg-cyber-accent/20 border border-cyber-accent/30' : 'hover:bg-white/5 border border-transparent'}`}
+                onClick={handleSelectChat}
+                className={`group flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${isActive ? 'bg-cyber-accent/20 border border-cyber-accent/30' : 'hover:bg-white/5 border border-transparent'}`}
               >
-                <div className="relative w-10 h-10 rounded-full shrink-0 border border-cyber-muted/30">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleSelectChat(); }}
+                  className="relative w-10 h-10 rounded-full shrink-0 border border-cyber-muted/30 overflow-hidden"
+                  aria-label={`Open chat with ${friend.username}`}
+                >
                   <img 
                     src={friend.avatar ? friend.avatar : `https://api.dicebear.com/7.x/bottts/svg?seed=${friend.username}`} 
                     alt="Avatar" 
@@ -132,14 +142,39 @@ const Sidebar = ({ user, friends, onlineUsers, activeChat, setActiveChat, fetchF
                   {!isPending && (
                     <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border border-black ${isOnline ? 'bg-green-500 shadow-[0_0_5px_#22c55e]' : 'bg-gray-500'}`}></div>
                   )}
-                </div>
+                </button>
                 
                 <div className="flex-1 overflow-hidden">
-                  <div className="text-sm font-semibold text-white truncate">{friend.username}</div>
+                  <div className="text-sm font-semibold text-white truncate" onClick={handleSelectChat}>
+                    {friend.username}
+                  </div>
                   <div className="text-xs text-cyber-muted truncate">
                     {isPending ? (isRequester ? 'Request Sent' : 'Pending Request') : (isOnline ? 'Online' : 'Offline')}
                   </div>
                 </div>
+
+                {!isPending && (
+                  <div className={`flex gap-1 shrink-0 transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onStartCall?.(friend, 'voice'); }}
+                      className="p-1.5 bg-black/40 text-cyber-accent border border-cyber-accent/30 rounded hover:bg-cyber-accent/20 inline-flex items-center justify-center"
+                      title="Voice call"
+                      aria-label={`Voice call ${friend.username}`}
+                    >
+                      <Phone size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onStartCall?.(friend, 'video'); }}
+                      className="p-1.5 bg-black/40 text-cyber-accent border border-cyber-accent/30 rounded hover:bg-cyber-accent/20 inline-flex items-center justify-center"
+                      title="Video call"
+                      aria-label={`Video call ${friend.username}`}
+                    >
+                      <Video size={14} />
+                    </button>
+                  </div>
+                )}
 
                 {isPending && !isRequester && (
                   <div className="flex gap-1 shrink-0">

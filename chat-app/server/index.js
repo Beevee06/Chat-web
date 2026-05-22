@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -7,8 +8,10 @@ const multer = require('multer');
 const path = require('path');
 const db = require('./database');
 const { verifyToken, JWT_SECRET } = require('./middlewares/auth');
-const setupSocket = require('./socket');
+const { verifyAdminToken, ADMIN_JWT_SECRET } = require('./middlewares/admin');
+const { setupSocket, getOnlineUsersCount } = require('./socket');
 const fs = require('fs');
+const { backupDatabase } = require('./backup');
 
 const app = express();
 const server = http.createServer(app);
@@ -33,6 +36,21 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
+
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const LOG_DIR = path.join(__dirname, '..', 'logs');
+const LOG_FILES = {
+  combined: path.join(LOG_DIR, 'combined.log'),
+  error: path.join(LOG_DIR, 'error.log')
+};
+
+const readLogLines = (filePath, maxLines = 200) => {
+  if (!fs.existsSync(filePath)) return [];
+  const content = fs.readFileSync(filePath, 'utf8');
+  const lines = content.split(/\r?\n/).filter(Boolean);
+  return lines.slice(-maxLines);
+};
 
 // Helper to generate Friend Code
 const generateFriendCode = (username) => {
@@ -94,6 +112,113 @@ app.get('/api/me', verifyToken, (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   });
+});
+
+// --- ADMIN ROUTES ---
+app.post('/api/admin/login', (req, res) => {
+  const { username, password } = req.body || {};
+
+  if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+    return res.status(500).json({ error: 'Admin credentials not configured' });
+  }
+
+  if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Invalid admin credentials' });
+  }
+
+  const token = jwt.sign({ role: 'admin', username }, ADMIN_JWT_SECRET, { expiresIn: '12h' });
+  res.json({ token, admin: { username } });
+});
+
+app.get('/api/admin/stats', verifyAdminToken, (req, res) => {
+  const stats = {};
+
+  db.get('SELECT COUNT(*) AS count FROM users', (err, row) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    stats.users = row.count || 0;
+
+    db.get('SELECT COUNT(*) AS count FROM messages', (err, row) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      stats.messages = row.count || 0;
+
+      db.get("SELECT COUNT(*) AS count FROM friends WHERE status = 'pending'", (err, row) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        stats.pendingRequests = row.count || 0;
+
+        db.get("SELECT COUNT(*) AS count FROM friends WHERE status = 'accepted'", (err, row) => {
+          if (err) return res.status(500).json({ error: 'Database error' });
+          stats.acceptedFriends = row.count || 0;
+
+          const uploadsDir = path.join(__dirname, 'uploads');
+          let uploadsSize = 0;
+          let uploadsCount = 0;
+          if (fs.existsSync(uploadsDir)) {
+            const files = fs.readdirSync(uploadsDir);
+            files.forEach((file) => {
+              const fullPath = path.join(uploadsDir, file);
+              const fileStat = fs.statSync(fullPath);
+              if (fileStat.isFile()) {
+                uploadsSize += fileStat.size;
+                uploadsCount += 1;
+              }
+            });
+          }
+
+          const dbPath = path.join(__dirname, 'database.sqlite');
+          const dbSize = fs.existsSync(dbPath) ? fs.statSync(dbPath).size : 0;
+
+          stats.onlineUsers = getOnlineUsersCount();
+          stats.uploadsCount = uploadsCount;
+
+          stats.storage = {
+            uploadsBytes: uploadsSize,
+            databaseBytes: dbSize
+          };
+
+          res.json(stats);
+        });
+      });
+    });
+  });
+});
+
+app.get('/api/admin/users', verifyAdminToken, (req, res) => {
+  db.all('SELECT id, username, avatar, friend_code, created_at FROM users ORDER BY created_at DESC', (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    res.json(rows);
+  });
+});
+
+app.delete('/api/admin/users/:id', verifyAdminToken, (req, res) => {
+  const userId = Number(req.params.id);
+  if (!userId) return res.status(400).json({ error: 'Invalid user id' });
+
+  db.serialize(() => {
+    db.run('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', [userId, userId]);
+    db.run('DELETE FROM friends WHERE requester_id = ? OR receiver_id = ?', [userId, userId]);
+    db.run('DELETE FROM users WHERE id = ?', [userId], function (err) {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      if (this.changes === 0) return res.status(404).json({ error: 'User not found' });
+      res.json({ message: 'User deleted' });
+    });
+  });
+});
+
+app.post('/api/admin/backup', verifyAdminToken, (req, res) => {
+  backupDatabase();
+  res.json({ message: 'Backup started' });
+});
+
+app.get('/api/admin/logs', verifyAdminToken, (req, res) => {
+  const type = (req.query.type || 'combined').toString();
+  const maxLines = Math.min(Number(req.query.lines) || 200, 1000);
+
+  if (!LOG_FILES[type]) {
+    return res.status(400).json({ error: 'Invalid log type' });
+  }
+
+  const lines = readLogLines(LOG_FILES[type], maxLines);
+  res.json({ type, lines });
 });
 
 // --- FRIEND ROUTES ---

@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import io from 'socket.io-client';
 import axios from 'axios';
 import Sidebar from '../components/Sidebar';
 import ChatArea from '../components/ChatArea';
+import CallOverlay from '../components/CallOverlay';
+import { AnimatePresence } from 'framer-motion';
 import { Loader } from 'lucide-react';
 
 const Chat = () => {
@@ -15,9 +17,39 @@ const Chat = () => {
   const [messages, setMessages] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState(null);
+  const [isCallOpen, setIsCallOpen] = useState(false);
+  const [callMode, setCallMode] = useState(null);
+  const [callTarget, setCallTarget] = useState(null);
+
+  const socketUrl = useMemo(() => {
+    if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+    return new URL(API_URL, window.location.origin).origin;
+  }, [API_URL]);
+
+  const fetchFriends = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_URL}/friends`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setFriends(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [API_URL]);
+
+  const fetchMessages = useCallback(async (friendId) => {
+    try {
+      const res = await axios.get(`${API_URL}/messages/${friendId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setMessages(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [API_URL]);
 
   useEffect(() => {
-    const newSocket = io('/', {
+    const newSocket = io(socketUrl, {
       auth: { token: localStorage.getItem('token') }
     });
 
@@ -54,11 +86,29 @@ const Chat = () => {
     });
 
     return () => newSocket.close();
-  }, []);
+  }, [socketUrl]);
 
   useEffect(() => {
+    if (!user) return;
     fetchFriends();
-  }, []);
+
+    const interval = setInterval(fetchFriends, 5000);
+    const handleFocus = () => fetchFriends();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchFriends();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user, fetchFriends]);
 
   useEffect(() => {
     if (activeChat) {
@@ -66,27 +116,13 @@ const Chat = () => {
     }
   }, [activeChat]);
 
-  const fetchFriends = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/friends`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      setFriends(res.data);
-    } catch (err) {
-      console.error(err);
+  useEffect(() => {
+    if (!activeChat) return;
+    const updated = friends.find((friend) => friend.id === activeChat.id);
+    if (updated && updated.status !== activeChat.status) {
+      setActiveChat(updated);
     }
-  };
-
-  const fetchMessages = async (friendId) => {
-    try {
-      const res = await axios.get(`${API_URL}/messages/${friendId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      setMessages(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  }, [friends, activeChat]);
 
   const handleSendMessage = (text, imageUrl = null) => {
     if (!socket || (!text.trim() && !imageUrl)) return;
@@ -107,6 +143,25 @@ const Chat = () => {
     }
   };
 
+  const handleStartCall = (target, mode) => {
+    if (!target) return;
+    setActiveChat(target);
+    setCallTarget(target);
+    setCallMode(mode);
+    setIsCallOpen(true);
+  };
+
+  const handleStartCallFromChat = (mode) => {
+    if (!activeChat) return;
+    handleStartCall(activeChat, mode);
+  };
+
+  const handleCloseCall = () => {
+    setIsCallOpen(false);
+    setCallMode(null);
+    setCallTarget(null);
+  };
+
   if (!user) return <div className="flex w-full h-full justify-center items-center"><Loader className="animate-spin text-cyber-accent" /></div>;
 
   return (
@@ -121,6 +176,7 @@ const Chat = () => {
         setActiveChat={setActiveChat}
         fetchFriends={fetchFriends}
         API_URL={API_URL}
+        onStartCall={handleStartCall}
       />
       
       <ChatArea 
@@ -133,7 +189,20 @@ const Chat = () => {
         isTyping={isTyping}
         typingUser={typingUser}
         API_URL={API_URL}
+        onStartCall={handleStartCallFromChat}
       />
+
+      <AnimatePresence>
+        {isCallOpen && callTarget && (
+          <CallOverlay
+            isOpen={isCallOpen}
+            onClose={handleCloseCall}
+            mode={callMode || 'voice'}
+            contact={callTarget}
+            isOnline={onlineUsers.includes(callTarget.id)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

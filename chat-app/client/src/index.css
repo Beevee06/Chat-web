@@ -1,12 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --nexus-surface: #0f131e;
+  --nexus-surface-lowest: #0a0e19;
+  --nexus-surface-high: #262a36;
+  --nexus-on-surface: #dfe2f2;
+  --nexus-on-surface-variant: #b9caca;
+  --nexus-primary: #00f5ff;
+  --nexus-secondary: #ff24e4;
+}
+
 @layer base {
   body {
     @apply bg-cyber-bg text-cyber-text font-sans m-0 p-0 overflow-hidden;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Sora', sans-serif;
   }
 }
 
@@ -31,36 +45,36 @@
 
 /* Glassmorphism */
 .glass-panel {
-  background: rgba(22, 22, 35, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 240, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .glass-input {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(0, 240, 255, 0.2);
-  color: #e0e0ff;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 245, 255, 0.2);
+  color: var(--nexus-on-surface);
   transition: all 0.3s ease;
 }
 
 .glass-input:focus {
   outline: none;
-  border-color: rgba(0, 240, 255, 0.8);
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+  border-color: rgba(0, 245, 255, 0.8);
+  box-shadow: 0 0 12px rgba(0, 245, 255, 0.25);
 }
 
 .glass-button {
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(0, 240, 255, 0.05));
-  border: 1px solid rgba(0, 240, 255, 0.5);
-  color: #00f0ff;
+  background: rgba(0, 245, 255, 0.2);
+  border: 1px solid rgba(0, 245, 255, 0.5);
+  color: #00f5ff;
   transition: all 0.3s ease;
-  text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
+  text-shadow: 0 0 6px rgba(0, 245, 255, 0.5);
 }
 
 .glass-button:hover {
-  background: rgba(0, 240, 255, 0.2);
-  box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+  background: rgba(0, 245, 255, 0.28);
+  box-shadow: 0 0 15px rgba(0, 245, 255, 0.4);
 }
 
 /* Neon Text */
@@ -69,9 +83,83 @@
   text-shadow:
     0 0 5px #fff,
     0 0 10px #fff,
-    0 0 20px #00f0ff,
-    0 0 40px #00f0ff,
-    0 0 80px #00f0ff;
+    0 0 20px #00f5ff,
+    0 0 40px #00f5ff,
+    0 0 80px #00f5ff;
+}
+
+/* HUD helpers */
+.hud-corner {
+  width: 28px;
+  height: 28px;
+  border-color: rgba(0, 245, 255, 0.5);
+  border-style: solid;
+}
+
+.hud-top-left { border-width: 2px 0 0 2px; }
+.hud-top-right { border-width: 2px 2px 0 0; }
+.hud-bottom-left { border-width: 0 0 2px 2px; }
+.hud-bottom-right { border-width: 0 2px 2px 0; }
+
+.scanlines {
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0) 50%,
+    rgba(0, 0, 0, 0.12) 50%,
+    rgba(0, 0, 0, 0.12)
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+}
+
+.glow-text {
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.6);
+}
+
+.hud-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 56px;
+  border: 1px solid rgba(0, 245, 255, 0.3);
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.hud-crosshair::before,
+.hud-crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(0, 245, 255, 0.5);
+}
+
+.hud-crosshair::before {
+  top: -10px;
+  bottom: -10px;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+}
+
+.hud-crosshair::after {
+  left: -10px;
+  right: -10px;
+  top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+@keyframes pulse-red {
+  0% { opacity: 1; }
+  50% { opacity: 0.35; }
+  100% { opacity: 1; }
+}
+
+.animate-record-pulse {
+  animation: pulse-red 2s infinite;
 }
 
 /* Loading animation for messages */
